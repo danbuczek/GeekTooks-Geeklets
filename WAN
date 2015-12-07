@@ -1,0 +1,83 @@
+#!/bin/sh
+
+IFS='%'
+
+# Get the IP address of the external IP.
+external=`curl --silent http://checkip.dyndns.org | awk '{print $6}' | cut -f 1 -d "<"`
+
+# Check to see if there is an external address
+if [ "$external" == "" ]
+then
+  external="N/A"
+fi
+
+# Designate the interfaces
+INTE=en0
+INTW=en1
+
+#Values of 1024 correlating to MB/GB
+KB=1024
+MB=$(echo "1024^2" | bc)
+GB=$(echo "1024^3" | bc)
+
+# Sum the total of the input data
+INE=`/usr/sbin/netstat -ibn | awk "/$INTE/"'{print $7; exit}'`
+INW=`/usr/sbin/netstat -ibn | awk "/$INTW/"'{print $7; exit}'`
+IN=$(($INW+$INE))
+
+# Sum the total of the output data
+OUTE=`/usr/sbin/netstat -ibn | awk "/$INTE/"'{print $10; exit}'`
+OUTW=`/usr/sbin/netstat -ibn | awk "/$INTW/"'{print $10; exit}'`
+OUT=$(($OUTW+$OUTE))
+
+# Display the total input data
+SIZE=`echo $IN | wc -m`
+
+if [ $SIZE -lt 4 ]; then
+  TIN="$IN"
+  INTYPE="  B"
+elif [ $SIZE -lt 7]; then
+  TIN="$(echo "scale=3; $IN / $KB" | bc)"
+  INTYPE=" KB"
+elif [ $SIZE -lt 11 ]; then
+  TIN="$(echo "scale=3; $IN / $MB" | bc)"
+  INTYPE=" MB"
+else
+  TIN="$(echo "scale=3; $IN / $GB" | bc)"
+  INTYPE=" GB"
+fi
+
+# Display the total output data
+SIZE=`echo $OUT | wc -m`
+
+if [ $SIZE -lt 4 ]; then
+  TOUT="$OUT"
+  OUTTYPE="  B"
+elif [ $SIZE -lt 7 ]; then
+  TOUT="$(echo "scale=3; $OUT / $KB" | bc)"
+  OUTTYPE=" KB"
+elif [ $SIZE -lt 11 ]; then
+  TOUT="$(echo "scale=3; $OUT / $MB" | bc)"
+  OUTTYPE=" MB"
+else
+  TOUT="$(echo "scale=3; $OUT / $GB" | bc)"
+  OUTTYPE=" GB"
+fi
+
+# Print out everything that we need to
+
+printf "%s" " WAN:  " 
+printf "%15s" $external
+printf "%7s" "TI:" 
+printf "%10s" $TIN
+printf "%s" $INTYPE
+printf "%6s" " TO: "
+printf "%10s" $TOUT
+printf "%s" $OUTTYPE
+
+#(printf " WAN:*$external*TI:*" ; \
+# printf "%12s" $INF ; \
+# printf "*TO:* %11s\n" $TOUT) | column -t -s*
+
+#echo " WAN: " $external "blah"
+#echo " $INTYPE"
