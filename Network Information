@@ -1,0 +1,58 @@
+#!/bin/sh
+
+# Get the name of the currently connected SSID.  If none, name it "N/A"
+wifi_network=`/System/Library/PrivateFrameworks/Apple80211.framework/Versions/A/Resources/airport -I | awk -F: '/ SSID: / {print $2}' | sed -e 's/SSID: //' | sed -e 's/ //'`
+if [ "$wifi_network" == ""]
+then
+  echo yes
+  wifi_network="N/A"
+fi
+
+# Parse the network interfaces for the correct formatting
+en0cidr=`ifconfig en0 | grep "broadcast" | awk '{print $4}'`
+en0addr=`ifconfig en0 | grep "broadcast" | awk '{print $2}'`
+eth=`python /Users/dbuczek/Library/Geeklet\ Scripts/networkParse.py $en0addr $en0cidr`
+
+en1cidr=`ifconfig en1 | grep "broadcast" | awk '{print $4}'`
+en1addr=`ifconfig en1 | grep "broadcast" | awk '{print $2}'`
+wifi=`python /Users/dbuczek/Library/Geeklet\ Scripts/networkParse.py $en1addr $en1cidr`
+
+
+# Designate the interfaces
+INTE=en0
+INTW=en1
+
+#Values of 1024 correlating to MB/GB
+KB=1024
+MB=$(echo "1024^2" | bc)
+GB=$(echo "1024^3" | bc)
+
+# get the current number of bytes in and bytes out
+sample1w=(`/usr/sbin/netstat -ibn | awk "/$INTW/"'{print $7" "$10; exit}'`)
+sample1e=(`/usr/sbin/netstat -ibn | awk "/$INTE/"'{print $7" "$10; exit}'`)
+
+# wait one second
+sleep 1
+
+# get the number of bytes in and out one second later
+sample2w=(`/usr/sbin/netstat -ibn | awk "/$INTW/"'{print $7" "$10; exit}'`)
+sample2e=(`/usr/sbin/netstat -ibn | awk "/$INTE/"'{print $7" "$10; exit}'`)
+
+# find the difference between bytes in and out during that one second
+# and convert bytes to kilobytes
+resultsw=(`echo "2k ${sample2w[0]} ${sample1w[0]} - 1024 / p" "${sample2w[1]} ${sample1w[1]} - 1024 / p" | dc`)
+resultse=(`echo "2k ${sample2e[0]} ${sample1e[0]} - 1024 / p" "${sample2e[1]} ${sample1e[1]} - 1024 / p" | dc`)
+
+# print the results
+# printf "I:\t %.2f Kb/sec\n" ${resultse[0]}
+# printf "I:\t %.2f Kb/sec\n" ${resultsw[0]}
+EIN=`printf "%7.2f Kb/s" ${resultse[0]}`
+EOUT=`printf "%7.2f Kb/s" ${resultse[1]}`
+WIN=`printf "%7.2f Kb/s" ${resultsw[0]}`
+WOUT=`printf "%7.2f Kb/s" ${resultsw[1]}`
+
+# Print out everything that we need to
+
+(printf " ETH:*$eth*I:*$EIN*O:*$EOUT\n" ; \
+ printf "WIFI:*$wifi*I:*$WIN*O:*$WOUT\n" ; \
+ printf "SSID:*$wifi_network\n") | column -t -s*
